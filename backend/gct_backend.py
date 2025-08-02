@@ -1121,6 +1121,14 @@ def create_app():
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
+    # Import and register enhanced API endpoints
+    try:
+        from enhanced_api_endpoints import enhanced_api
+        app.register_blueprint(enhanced_api)
+        logger.info('Enhanced API endpoints registered successfully')
+    except ImportError:
+        logger.warning('Enhanced API endpoints not available')
+    
     return app
 
 # ============================================================================
