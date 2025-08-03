@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 
-# Import core types from main module
-from gct_backend import CoherenceProfile, CoherenceVariables
+# Import core types from shared module
+from gct_types import CoherenceProfile, CoherenceVariables
 
 class RecoveryUrgency(Enum):
     CRITICAL = "critical"      # Coherence < 1.0, immediate intervention needed

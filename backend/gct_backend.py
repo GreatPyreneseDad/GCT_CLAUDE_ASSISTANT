@@ -24,63 +24,19 @@ from enum import Enum
 import json
 import sqlite3
 from contextlib import contextmanager
+import logging
 
-# ============================================================================
-# CORE DATA STRUCTURES
-# ============================================================================
+# Import shared types
+from gct_types import (
+    AssessmentTier, 
+    CoherenceVariables, 
+    CoherenceProfile, 
+    CommunicationAnalysis
+)
 
-class AssessmentTier(Enum):
-    BASIC = "basic"
-    PROFESSIONAL = "professional"
-    ADVANCED = "advanced"
-    CONTINUOUS = "continuous"
-
-@dataclass
-class CoherenceVariables:
-    """Core GCT variables with mathematical precision"""
-    psi: float  # Internal Consistency (0.0-1.0)
-    rho: float  # Accumulated Wisdom (0.0-1.0, age-adjusted)
-    q: float    # Moral Activation Energy (0.0-1.0, biologically optimized)
-    f: float    # Social Belonging Architecture (0.0-1.0)
-    
-    def __post_init__(self):
-        # Ensure all values are within valid range
-        for field in ['psi', 'rho', 'q', 'f']:
-            value = getattr(self, field)
-            if not 0.0 <= value <= 1.0:
-                raise ValueError(f"{field} must be between 0.0 and 1.0, got {value}")
-
-@dataclass
-class CoherenceProfile:
-    """Complete coherence assessment profile"""
-    user_id: str
-    variables: CoherenceVariables
-    static_coherence: float
-    coherence_velocity: Optional[float] = None
-    assessment_tier: AssessmentTier = AssessmentTier.BASIC
-    timestamp: datetime = None
-    age: Optional[int] = None
-    context: str = "general"
-    individual_optimization: Dict[str, float] = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now()
-        if self.individual_optimization is None:
-            self.individual_optimization = {}
-
-@dataclass
-class CommunicationAnalysis:
-    """Analysis of text/speech for coherence patterns"""
-    text: str
-    consistency_score: float
-    wisdom_indicators: float
-    moral_activation: float
-    social_awareness: float
-    authenticity_score: float
-    red_flags: List[str]
-    enhancement_suggestions: List[str]
-    confidence_level: float
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # DATABASE SCHEMA AND MANAGEMENT
@@ -954,11 +910,31 @@ class RelationshipMapper:
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+from dotenv import load_dotenv
 
-def create_app():
+def create_app(config_name='production'):
     """Factory function to create Flask app"""
+    # Load environment variables
+    if config_name == 'local':
+        load_dotenv('.env.local')
+    else:
+        load_dotenv()
+    
     app = Flask(__name__)
-    CORS(app)  # Enable CORS for Vercel frontend
+    
+    # Configure based on environment
+    if config_name == 'local':
+        try:
+            from local_config import LocalConfig
+            app.config.from_object(LocalConfig)
+            LocalConfig.init_app(app)
+            # Configure CORS for local development
+            CORS(app, origins=['http://localhost:3000', 'http://127.0.0.1:3000'])
+        except ImportError:
+            # Fallback if local_config doesn't exist
+            CORS(app)
+    else:
+        CORS(app)  # Enable CORS for production
     
     # Initialize database
     db_path = os.getenv('DATABASE_PATH', 'gct_data.db')
@@ -1122,12 +1098,35 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     # Import and register enhanced API endpoints
+    # Delayed import to avoid circular dependency
     try:
         from enhanced_api_endpoints import enhanced_api
         app.register_blueprint(enhanced_api)
         logger.info('Enhanced API endpoints registered successfully')
-    except ImportError:
-        logger.warning('Enhanced API endpoints not available')
+    except ImportError as e:
+        logger.warning(f'Enhanced API endpoints not available: {e}')
+    
+    # Import and register GPU-accelerated API endpoints
+    try:
+        from gpu_api_endpoints import gpu_api
+        app.register_blueprint(gpu_api, url_prefix='/api')
+        logger.info('GPU-accelerated API endpoints registered successfully')
+    except ImportError as e:
+        logger.warning(f'GPU-accelerated API endpoints not available: {e}')
+    
+    # Import and register Apple Intelligence bridge endpoints
+    try:
+        import sys
+        sys.path.append('../integration')
+        from gct_apple_intelligence_bridge import GCTAppleIntelligenceBridge, GCTAPIWrapper
+        from flask import request
+        
+        bridge = GCTAppleIntelligenceBridge()
+        wrapper = GCTAPIWrapper(bridge)
+        wrapper.create_flask_endpoints(app)
+        logger.info('Apple Intelligence bridge registered successfully')
+    except ImportError as e:
+        logger.warning(f'Apple Intelligence bridge not available: {e}')
     
     return app
 
@@ -1197,8 +1196,8 @@ def assess_innovation_timing(profile: CoherenceProfile) -> str:
 
 if __name__ == '__main__':
     # For local development
-    app = create_app()
+    app = create_app('local')
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
 
-# For Render deployment
-app = create_app()
+# For production deployment
+app = create_app('production')

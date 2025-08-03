@@ -9,7 +9,7 @@ from enum import Enum
 import networkx as nx
 
 # Import core types
-from gct_backend import CoherenceProfile, CoherenceVariables
+from gct_types import CoherenceProfile, CoherenceVariables
 
 class GroupType(Enum):
     FAMILY = "family"

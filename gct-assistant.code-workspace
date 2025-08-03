@@ -1,0 +1,85 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "GCT Assistant"
+    },
+    {
+      "path": "backend",
+      "name": "Backend (Flask)"
+    },
+    {
+      "path": "frontend",
+      "name": "Frontend (Next.js)"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": true
+    },
+    "python.defaultInterpreterPath": "${workspaceFolder:Backend (Flask)}/venv/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black",
+    "typescript.tsdk": "${workspaceFolder:Frontend (Next.js)}/node_modules/typescript/lib",
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.pyc": true,
+      "**/node_modules": true,
+      "**/.next": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/venv": true,
+      "**/.next": true,
+      "**/build": true
+    }
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Backend: Flask",
+        "type": "python",
+        "request": "launch",
+        "module": "flask",
+        "env": {
+          "FLASK_APP": "gct_backend.py",
+          "FLASK_ENV": "development",
+          "FLASK_DEBUG": "1"
+        },
+        "args": ["run", "--host=0.0.0.0", "--port=5000"],
+        "jinja": true,
+        "cwd": "${workspaceFolder:Backend (Flask)}"
+      },
+      {
+        "name": "Frontend: Next.js",
+        "type": "node",
+        "request": "launch",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": ["run", "dev"],
+        "cwd": "${workspaceFolder:Frontend (Next.js)}",
+        "console": "integratedTerminal"
+      }
+    ],
+    "compounds": [
+      {
+        "name": "Full Stack",
+        "configurations": ["Backend: Flask", "Frontend: Next.js"],
+        "stopAll": true
+      }
+    ]
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "bradlc.vscode-tailwindcss",
+      "formulahendry.auto-rename-tag",
+      "christian-kohler.path-intellisense"
+    ]
+  }
+}

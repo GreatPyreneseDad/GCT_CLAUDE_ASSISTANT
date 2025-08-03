@@ -9,7 +9,7 @@ from enum import Enum
 import hashlib
 
 # Import core types
-from gct_backend import CoherenceProfile, CommunicationAnalysis
+from gct_types import CoherenceProfile, CommunicationAnalysis
 
 class AIInteractionType(Enum):
     INFORMATIONAL = "informational"      # Fact-seeking, knowledge queries

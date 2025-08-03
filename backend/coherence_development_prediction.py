@@ -5,12 +5,11 @@ import numpy as np
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from sklearn.linear_model import LinearRegression
 import warnings
 warnings.filterwarnings('ignore')
 
 # Import core types and enhancement modules
-from gct_backend import CoherenceProfile, CoherenceVariables
+from gct_types import CoherenceProfile, CoherenceVariables
 from temporal_coherence import TemporalPattern, CircadianType
 from coherence_recovery import RecoveryPlan, RecoveryIntervention
 from ai_coherence_interaction import AIInteractionType

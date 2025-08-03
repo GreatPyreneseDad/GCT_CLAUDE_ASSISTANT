@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Import core types
-from gct_backend import CoherenceVariables, CoherenceProfile
+from gct_types import CoherenceVariables, CoherenceProfile
 
 class CulturalContext(Enum):
     INDIVIDUALIST_WESTERN = "individualist_western"

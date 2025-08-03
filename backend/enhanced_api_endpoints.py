@@ -5,6 +5,9 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 import json
 
+# Import shared types
+from gct_types import CoherenceProfile, CoherenceVariables, CommunicationAnalysis
+
 # Import enhancement modules
 from temporal_coherence import TemporalCoherenceAnalyzer, CircadianType
 from coherence_recovery import CoherenceRecoveryProtocol, RecoveryUrgency
@@ -13,9 +16,8 @@ from cultural_calibration import CulturalCoherenceCalibrator, CulturalContext
 from coherence_contagion import CoherenceContagionModel, GroupType
 from coherence_development_prediction import CoherenceDevelopmentPredictor
 
-# Import core components
+# Import core components (avoiding circular import)
 from gct_backend import GCTDatabase, GCTAssessment
-from gct_backend import logger
 
 # Create blueprint for enhanced endpoints
 enhanced_api = Blueprint('enhanced_api', __name__)
@@ -192,7 +194,6 @@ def analyze_ai_interaction():
         
         if profile:
             # Analyze impact
-            from gct_backend import CommunicationAnalysis
             ai_response_analysis = CommunicationAnalysis(
                 text="",
                 consistency_score=0.7,
