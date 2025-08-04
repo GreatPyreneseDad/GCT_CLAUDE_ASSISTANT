@@ -1,0 +1,61 @@
+/* Styles for the chat coherence widget */
+
+#chat-coherence-widget {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+#chat-coherence-widget * {
+  box-sizing: border-box;
+}
+
+#chat-coherence-widget button {
+  font-family: inherit;
+}
+
+/* Ensure widget stays on top */
+#chat-coherence-widget {
+  z-index: 2147483647 !important;
+}
+
+/* Animation for widget appearance */
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+#chat-coherence-widget {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Metric cards hover effect */
+#chat-coherence-widget .metric-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#chat-coherence-widget .metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Pulse animation for real-time updates */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#chat-coherence-widget.updating #overall-score {
+  animation: pulse 0.3s ease-in-out;
+}

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Chat Coherence Analyzer</title>
+  <style>
+    body {
+      width: 350px;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+    .content {
+      padding: 20px;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    .status-indicator.active {
+      background: #10b981;
+    }
+    .status-indicator.inactive {
+      background: #ef4444;
+    }
+    .toggle-button {
+      width: 100%;
+      padding: 12px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-button:hover {
+      background: #5a56d6;
+    }
+    .toggle-button.stop {
+      background: #ef4444;
+    }
+    .toggle-button.stop:hover {
+      background: #dc2626;
+    }
+    .info {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .metric {
+      background: #f9fafb;
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .metric-label {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #1f2937;
+    }
+    .privacy-note {
+      margin-top: 20px;
+      padding: 10px;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Chat Coherence Analyzer</h1>
+  </div>
+  
+  <div class="content">
+    <div class="status">
+      <div class="status-indicator" id="status-indicator"></div>
+      <span id="status-text">Checking...</span>
+    </div>
+    
+    <button class="toggle-button" id="toggle-button">Start Analyzing</button>
+    
+    <div class="info">
+      <strong>How it works:</strong><br>
+      This extension analyzes the quality of human conversations using four key metrics:
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        <li><strong>Consistency:</strong> Logical flow and coherence</li>
+        <li><strong>Relevance:</strong> Staying on topic</li>
+        <li><strong>Engagement:</strong> Active participation</li>
+        <li><strong>Empathy:</strong> Understanding and support</li>
+      </ul>
+    </div>
+    
+    <div class="metrics" id="metrics" style="display: none;">
+      <div class="metric">
+        <div class="metric-label">Messages</div>
+        <div class="metric-value" id="message-count">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Avg Quality</div>
+        <div class="metric-value" id="avg-quality">--%</div>
+      </div>
+    </div>
+    
+    <div class="privacy-note">
+      <strong>Privacy:</strong> All analysis happens locally in your browser. No conversation data is stored or transmitted.
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
