@@ -945,6 +945,10 @@ def create_app(config_name='production'):
     comm_analyzer = CommunicationAnalyzer()
     relationship_mapper = RelationshipMapper()
     
+    # Import and register additional blueprints
+    from text_coherence_api import text_coherence_bp
+    app.register_blueprint(text_coherence_bp)
+    
     @app.route('/health', methods=['GET'])
     def health_check():
         """Health check endpoint"""

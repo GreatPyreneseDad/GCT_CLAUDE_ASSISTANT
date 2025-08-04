@@ -1,0 +1,5 @@
+This is a placeholder for icon128.png
+Please generate the actual PNG using one of these methods:
+1. Open generate-icons.html in Chrome and download the 128x128 icon
+2. Use an online converter at https://cloudconvert.com/svg-to-png
+3. Use an image editor to export the SVG at 128x128 pixels

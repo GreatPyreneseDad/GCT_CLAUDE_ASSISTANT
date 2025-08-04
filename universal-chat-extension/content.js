@@ -12,11 +12,15 @@ class HumanConversationAnalyzer {
       startTime: Date.now(),
       messages: [],
       turnTaking: [],
-      responseLatencies: []
+      responseLatencies: [],
+      scoreLog: [] // Track scores over time
     };
+    this.messageCount = 0;
   }
 
   analyzeMessage(text, sender, timestamp = Date.now()) {
+    this.messageCount++;
+    
     // Enhanced metrics for human conversation
     const metrics = {
       // Original GCT dimensions
@@ -33,18 +37,37 @@ class HumanConversationAnalyzer {
       topicCoherence: this.calculateTopicCoherence(text)
     };
 
+    const overall = this.calculateOverallScore(metrics);
+    const elapsed = (timestamp - this.currentSession.startTime) / 1000; // seconds
+
     // Store message
-    this.currentSession.messages.push({
+    const messageData = {
       text,
       sender,
       timestamp,
-      metrics
+      metrics,
+      overall
+    };
+    
+    this.currentSession.messages.push(messageData);
+    
+    // Add to score log for graphing
+    this.currentSession.scoreLog.push({
+      time: elapsed,
+      score: overall,
+      psi: metrics.psi,
+      rho: metrics.rho,
+      q: metrics.q,
+      f: metrics.f,
+      messageCount: this.messageCount
     });
 
     return {
       metrics,
-      overall: this.calculateOverallScore(metrics),
-      insights: this.generateInsights(metrics)
+      overall,
+      insights: this.generateInsights(metrics),
+      scoreLog: this.currentSession.scoreLog,
+      messageCount: this.messageCount
     };
   }
 
@@ -369,6 +392,43 @@ class UniversalChatDetector {
     
     return info;
   }
+  
+  isAdvertisement(element) {
+    // Check if element or its parents contain ad indicators
+    const adIndicators = [
+      'sponsored', 'ad', 'advertisement', 'promo', 'promoted',
+      'suggested', 'recommended'
+    ];
+    
+    const elementText = element.textContent.toLowerCase();
+    const elementClasses = element.className ? element.className.toLowerCase() : '';
+    
+    // Check element and its parents for ad indicators
+    let currentElement = element;
+    for (let i = 0; i < 5; i++) { // Check up to 5 parent levels
+      if (!currentElement) break;
+      
+      const classes = currentElement.className ? currentElement.className.toLowerCase() : '';
+      const id = currentElement.id ? currentElement.id.toLowerCase() : '';
+      
+      for (const indicator of adIndicators) {
+        if (classes.includes(indicator) || id.includes(indicator)) {
+          return true;
+        }
+      }
+      
+      currentElement = currentElement.parentElement;
+    }
+    
+    // Check for common ad patterns in text
+    if (elementText.includes('sponsored') || 
+        elementText.includes('promoted') ||
+        elementText.startsWith('ad ')) {
+      return true;
+    }
+    
+    return false;
+  }
 }
 
 // Main Chat Monitor
@@ -394,7 +454,12 @@ class UniversalChatMonitor {
     
     this.currentPattern = pattern;
     this.createWidget();
-    this.startMonitoring();
+    
+    // Show widget if enabled
+    if (this.enabled) {
+      this.widget.show();
+      this.startMonitoring();
+    }
     
     // Listen for enable/disable from popup
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -412,112 +477,224 @@ class UniversalChatMonitor {
   }
 
   createWidget() {
-    // Create floating widget similar to the AI version
+    // Create floating widget with shadow DOM for isolation
     const container = document.createElement('div');
     container.id = 'chat-coherence-widget';
     container.style.cssText = `
       position: fixed;
       bottom: 20px;
       left: 20px;
-      width: 320px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-      z-index: 999999;
-      font-family: -apple-system, sans-serif;
-      display: none;
+      width: 380px;
+      z-index: 2147483647;
     `;
     
-    container.innerHTML = `
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                  color: white; padding: 12px 16px; border-radius: 12px 12px 0 0;
-                  display: flex; justify-content: space-between; align-items: center;">
-        <div>Chat Quality Monitor</div>
-        <button id="widget-close" style="background: rgba(255,255,255,0.2); 
-                border: none; color: white; padding: 4px 8px; 
-                border-radius: 4px; cursor: pointer;">×</button>
-      </div>
-      <div id="widget-content" style="padding: 16px;">
-        <div id="overall-score" style="text-align: center; margin-bottom: 16px;">
-          <div style="font-size: 36px; font-weight: bold;">--</div>
-          <div>Conversation Quality</div>
+    // Use shadow DOM for style isolation
+    const shadowRoot = container.attachShadow({ mode: 'open' });
+    
+    shadowRoot.innerHTML = `
+      <style>
+        * { box-sizing: border-box; }
+        .widget-container {
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          font-family: -apple-system, sans-serif;
+          font-size: 14px;
+          overflow: hidden;
+        }
+        .widget-header {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 12px 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .close-btn {
+          background: rgba(255,255,255,0.2);
+          border: none;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .widget-body {
+          padding: 16px;
+        }
+        .score-main {
+          text-align: center;
+          margin-bottom: 16px;
+        }
+        .score-value {
+          font-size: 36px;
+          font-weight: bold;
+        }
+        .metrics-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .metric-card {
+          background: #f3f4f6;
+          padding: 12px;
+          border-radius: 8px;
+        }
+        .metric-label {
+          font-size: 11px;
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+        .metric-value {
+          font-size: 18px;
+          font-weight: 600;
+        }
+        .graph-container {
+          margin-top: 16px;
+          height: 120px;
+          background: #f9fafb;
+          border-radius: 8px;
+          position: relative;
+        }
+        .graph-canvas {
+          width: 100%;
+          height: 100%;
+        }
+        .stats-row {
+          display: flex;
+          justify-content: space-between;
+          margin: 8px 0;
+          font-size: 12px;
+        }
+        .insights {
+          margin-top: 16px;
+          font-size: 12px;
+          color: #666;
+        }
+        .export-btn {
+          width: 100%;
+          margin-top: 16px;
+          background: #667eea;
+          color: white;
+          border: none;
+          padding: 8px;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+        .export-btn:hover {
+          background: #5a56d6;
+        }
+      </style>
+      <div class="widget-container">
+        <div class="widget-header">
+          <div>Chat Quality Monitor</div>
+          <button class="close-btn" id="widget-close">×</button>
         </div>
-        <div id="metrics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <!-- Metrics will be inserted here -->
+        <div class="widget-body">
+          <div class="score-main">
+            <div class="score-value" id="overall-score">--</div>
+            <div>Conversation Quality</div>
+          </div>
+          <div class="metrics-grid" id="metrics-grid">
+            <!-- Metrics will be inserted here -->
+          </div>
+          <div class="graph-container">
+            <canvas class="graph-canvas" id="coherence-graph"></canvas>
+          </div>
+          <div class="stats-row">
+            <span>Messages: <strong id="message-count">0</strong></span>
+            <span>Duration: <strong id="duration">0:00</strong></span>
+          </div>
+          <div class="insights" id="insights">
+            <!-- Insights will be inserted here -->
+          </div>
+          <button class="export-btn" id="export-btn">
+            Export Conversation Analysis
+          </button>
         </div>
-        <div id="insights" style="margin-top: 16px; font-size: 12px; color: #666;">
-          <!-- Insights will be inserted here -->
-        </div>
-        <button id="export-btn" style="width: 100%; margin-top: 16px; 
-                background: #667eea; color: white; border: none; 
-                padding: 8px; border-radius: 6px; cursor: pointer;">
-          Export Conversation Analysis
-        </button>
       </div>
     `;
     
     document.body.appendChild(container);
+    
     this.widget = {
       container,
-      show: () => container.style.display = 'block',
+      shadowRoot,
+      show: () => {
+        container.style.display = 'block';
+        setTimeout(() => this.drawGraph(), 100);
+      },
       hide: () => container.style.display = 'none',
       update: (analysis) => this.updateWidget(analysis)
     };
     
     // Event listeners
-    document.getElementById('widget-close').addEventListener('click', () => {
+    shadowRoot.getElementById('widget-close').addEventListener('click', () => {
       this.widget.hide();
       this.enabled = false;
+      chrome.storage.local.set({[`active_${chrome.runtime.id}`]: false});
     });
     
-    document.getElementById('export-btn').addEventListener('click', () => {
+    shadowRoot.getElementById('export-btn').addEventListener('click', () => {
       this.exportAnalysis();
     });
   }
 
   updateWidget(analysis) {
+    if (!this.widget.shadowRoot) return;
+    
     const overall = (analysis.overall * 100).toFixed(0);
-    document.getElementById('overall-score').innerHTML = `
-      <div style="font-size: 36px; font-weight: bold; color: ${this.getScoreColor(analysis.overall)}">
-        ${overall}%
-      </div>
-      <div>Conversation Quality</div>
-    `;
+    const scoreElement = this.widget.shadowRoot.getElementById('overall-score');
+    if (scoreElement) {
+      scoreElement.textContent = overall + '%';
+      scoreElement.style.color = this.getScoreColor(analysis.overall);
+    }
     
     // Update metrics
-    const metricsHtml = `
-      <div class="metric-card" style="background: #f3f4f6; padding: 12px; border-radius: 8px;">
-        <div style="font-size: 11px; color: #6b7280;">Consistency</div>
-        <div style="font-size: 18px; font-weight: 600;">
-          ${(analysis.metrics.psi * 100).toFixed(0)}%
+    const metricsGrid = this.widget.shadowRoot.getElementById('metrics-grid');
+    if (metricsGrid) {
+      metricsGrid.innerHTML = `
+        <div class="metric-card">
+          <div class="metric-label">Consistency</div>
+          <div class="metric-value">${(analysis.metrics.psi * 100).toFixed(0)}%</div>
         </div>
-      </div>
-      <div class="metric-card" style="background: #f3f4f6; padding: 12px; border-radius: 8px;">
-        <div style="font-size: 11px; color: #6b7280;">Relevance</div>
-        <div style="font-size: 18px; font-weight: 600;">
-          ${(analysis.metrics.rho * 100).toFixed(0)}%
+        <div class="metric-card">
+          <div class="metric-label">Relevance</div>
+          <div class="metric-value">${(analysis.metrics.rho * 100).toFixed(0)}%</div>
         </div>
-      </div>
-      <div class="metric-card" style="background: #f3f4f6; padding: 12px; border-radius: 8px;">
-        <div style="font-size: 11px; color: #6b7280;">Engagement</div>
-        <div style="font-size: 18px; font-weight: 600;">
-          ${(analysis.metrics.q * 100).toFixed(0)}%
+        <div class="metric-card">
+          <div class="metric-label">Engagement</div>
+          <div class="metric-value">${(analysis.metrics.q * 100).toFixed(0)}%</div>
         </div>
-      </div>
-      <div class="metric-card" style="background: #f3f4f6; padding: 12px; border-radius: 8px;">
-        <div style="font-size: 11px; color: #6b7280;">Empathy</div>
-        <div style="font-size: 18px; font-weight: 600;">
-          ${(analysis.metrics.f * 100).toFixed(0)}%
+        <div class="metric-card">
+          <div class="metric-label">Empathy</div>
+          <div class="metric-value">${(analysis.metrics.f * 100).toFixed(0)}%</div>
         </div>
-      </div>
-    `;
-    document.getElementById('metrics-grid').innerHTML = metricsHtml;
+      `;
+    }
+    
+    // Update stats
+    const messageCount = this.widget.shadowRoot.getElementById('message-count');
+    if (messageCount) {
+      messageCount.textContent = analysis.messageCount || '0';
+    }
+    
+    const duration = this.widget.shadowRoot.getElementById('duration');
+    if (duration && this.analyzer.currentSession.startTime) {
+      const elapsed = Date.now() - this.analyzer.currentSession.startTime;
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      duration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
     
     // Update insights
-    if (analysis.insights && analysis.insights.length > 0) {
-      document.getElementById('insights').innerHTML = 
-        '<strong>Insights:</strong><br>' + analysis.insights.join('<br>');
+    const insights = this.widget.shadowRoot.getElementById('insights');
+    if (insights && analysis.insights && analysis.insights.length > 0) {
+      insights.innerHTML = '<strong>Insights:</strong><br>' + analysis.insights.join('<br>');
     }
+    
+    // Draw graph
+    this.drawGraph();
   }
 
   getScoreColor(score) {
@@ -525,6 +702,84 @@ class UniversalChatMonitor {
     if (score >= 0.6) return '#f59e0b';
     if (score >= 0.4) return '#f97316';
     return '#ef4444';
+  }
+  
+  drawGraph() {
+    if (!this.widget.shadowRoot || !this.analyzer.currentSession.scoreLog) return;
+    
+    const canvas = this.widget.shadowRoot.getElementById('coherence-graph');
+    if (!canvas) return;
+    
+    const data = this.analyzer.currentSession.scoreLog;
+    if (data.length < 2) return;
+    
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    
+    const padding = 10;
+    const width = rect.width - 2 * padding;
+    const height = rect.height - 2 * padding;
+    
+    // Find min/max for scaling
+    const times = data.map(d => d.time);
+    const scores = data.map(d => d.score);
+    const minTime = Math.min(...times);
+    const maxTime = Math.max(...times);
+    const minScore = Math.max(0, Math.min(...scores) - 0.1);
+    const maxScore = Math.min(1, Math.max(...scores) + 0.1);
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    
+    // Draw axes
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, height + padding);
+    ctx.lineTo(width + padding, height + padding);
+    ctx.stroke();
+    
+    // Draw grid lines
+    ctx.strokeStyle = '#f3f4f6';
+    for (let i = 0; i <= 4; i++) {
+      const y = padding + (i / 4) * height;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(width + padding, y);
+      ctx.stroke();
+    }
+    
+    // Draw line
+    ctx.strokeStyle = '#667eea';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    data.forEach((point, i) => {
+      const x = padding + ((point.time - minTime) / (maxTime - minTime || 1)) * width;
+      const y = padding + height - ((point.score - minScore) / (maxScore - minScore || 1)) * height;
+      
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    
+    ctx.stroke();
+    
+    // Draw points
+    ctx.fillStyle = '#667eea';
+    data.forEach((point) => {
+      const x = padding + ((point.time - minTime) / (maxTime - minTime || 1)) * width;
+      const y = padding + height - ((point.score - minScore) / (maxScore - minScore || 1)) * height;
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    });
   }
 
   startMonitoring() {
@@ -564,6 +819,12 @@ class UniversalChatMonitor {
   }
 
   processMessage(element) {
+    // Check if it's an ad
+    if (this.detector.isAdvertisement(element)) {
+      console.log('Chat Analyzer: Skipping advertisement');
+      return;
+    }
+    
     // Avoid processing the same message twice
     const messageId = element.textContent + element.className;
     if (this.processedMessages.has(messageId)) return;
@@ -591,26 +852,95 @@ class UniversalChatMonitor {
   }
 
   exportAnalysis() {
+    if (!this.analyzer || !this.analyzer.currentSession) {
+      console.error('No data to export');
+      return;
+    }
+    
+    const session = this.analyzer.currentSession;
+    const messages = session.messages;
+    
     const data = {
-      platform: this.currentPattern.name,
-      sessionStart: new Date(this.analyzer.currentSession.startTime).toISOString(),
-      messages: this.analyzer.currentSession.messages,
+      metadata: {
+        platform: this.currentPattern ? this.currentPattern.name : 'Unknown',
+        exportTime: new Date().toISOString(),
+        sessionStart: new Date(session.startTime).toISOString(),
+        duration: Date.now() - session.startTime,
+        version: '1.0.0'
+      },
       summary: {
-        totalMessages: this.analyzer.currentSession.messages.length,
-        participants: [...new Set(this.analyzer.currentSession.messages.map(m => m.sender))],
-        averageQuality: this.analyzer.currentSession.messages.reduce(
-          (sum, m) => sum + this.analyzer.calculateOverallScore(m.metrics), 0
-        ) / this.analyzer.currentSession.messages.length
-      }
+        totalMessages: messages.length,
+        participants: [...new Set(messages.map(m => m.sender))],
+        averageQuality: messages.length > 0 ? 
+          messages.reduce((sum, m) => sum + m.overall, 0) / messages.length : 0,
+        qualityTrend: this.calculateQualityTrend(),
+        highestScore: messages.length > 0 ? 
+          Math.max(...messages.map(m => m.overall)) : 0,
+        lowestScore: messages.length > 0 ? 
+          Math.min(...messages.map(m => m.overall)) : 0
+      },
+      messages: messages,
+      scoreTimeline: session.scoreLog,
+      insights: this.generateConversationInsights()
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `chat-analysis-${Date.now()}.json`;
+    a.download = `chat-analysis-${this.currentPattern ? this.currentPattern.name : 'unknown'}-${new Date().toISOString().split('T')[0]}.json`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    console.log('Analysis exported successfully');
+  }
+  
+  calculateQualityTrend() {
+    const scores = this.analyzer.currentSession.scoreLog;
+    if (scores.length < 2) return 'neutral';
+    
+    const firstHalf = scores.slice(0, Math.floor(scores.length / 2));
+    const secondHalf = scores.slice(Math.floor(scores.length / 2));
+    
+    const avgFirst = firstHalf.reduce((sum, s) => sum + s.score, 0) / firstHalf.length;
+    const avgSecond = secondHalf.reduce((sum, s) => sum + s.score, 0) / secondHalf.length;
+    
+    if (avgSecond > avgFirst + 0.05) return 'improving';
+    if (avgSecond < avgFirst - 0.05) return 'declining';
+    return 'stable';
+  }
+  
+  generateConversationInsights() {
+    const messages = this.analyzer.currentSession.messages;
+    if (messages.length === 0) return [];
+    
+    const insights = [];
+    const avgQuality = messages.reduce((sum, m) => sum + m.overall, 0) / messages.length;
+    
+    if (avgQuality > 0.8) {
+      insights.push('Excellent conversation quality overall');
+    } else if (avgQuality < 0.4) {
+      insights.push('Conversation quality could be improved');
+    }
+    
+    // Check balance
+    const senderCounts = {};
+    messages.forEach(m => {
+      senderCounts[m.sender] = (senderCounts[m.sender] || 0) + 1;
+    });
+    const counts = Object.values(senderCounts);
+    const maxDiff = Math.max(...counts) - Math.min(...counts);
+    if (maxDiff > messages.length * 0.3) {
+      insights.push('Conversation is dominated by one participant');
+    }
+    
+    return insights;
   }
 }
 

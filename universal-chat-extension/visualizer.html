@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Coherence Analysis Visualizer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f3f4f6;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area {
+            background: white;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f9fafb;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #ede9fe;
+        }
+        
+        .dashboard {
+            display: none;
+            gap: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .card h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #374151;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .metric-label {
+            color: #6b7280;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        
+        .messages-list {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .message-item {
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+        }
+        
+        .message-item:last-child {
+            border-bottom: none;
+        }
+        
+        .message-sender {
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 5px;
+        }
+        
+        .message-text {
+            color: #6b7280;
+            font-size: 0.9em;
+            max-width: 70%;
+        }
+        
+        .message-score {
+            font-weight: bold;
+            font-size: 1.2em;
+            padding: 5px 10px;
+            border-radius: 6px;
+            background: #f3f4f6;
+        }
+        
+        .score-high { color: #10b981; }
+        .score-medium { color: #f59e0b; }
+        .score-low { color: #ef4444; }
+        
+        .insights-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .insights-list li {
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Chat Coherence Analysis Visualizer</h1>
+            <p>Upload your exported chat analysis JSON file to visualize the conversation quality</p>
+        </div>
+        
+        <div class="upload-area" id="uploadArea">
+            <h2>📊 Drop your analysis file here</h2>
+            <p>or click to browse</p>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+        
+        <div class="dashboard" id="dashboard">
+            <!-- Summary Card -->
+            <div class="card">
+                <h2>📈 Conversation Summary</h2>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="avgQuality">--%</div>
+                        <div class="metric-label">Average Quality</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="totalMessages">0</div>
+                        <div class="metric-label">Total Messages</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="participants">0</div>
+                        <div class="metric-label">Participants</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="duration">0:00</div>
+                        <div class="metric-label">Duration</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Timeline Chart -->
+            <div class="card">
+                <h2>📊 Coherence Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="timelineChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Metrics Breakdown -->
+            <div class="card">
+                <h2>🎯 Metrics Breakdown</h2>
+                <div class="chart-container" style="height: 300px;">
+                    <canvas id="metricsChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Insights -->
+            <div class="card">
+                <h2>💡 Insights</h2>
+                <ul class="insights-list" id="insightsList"></ul>
+            </div>
+            
+            <!-- Messages -->
+            <div class="card">
+                <h2>💬 Message Analysis</h2>
+                <div class="messages-list" id="messagesList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let timelineChart, metricsChart;
+        
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const dashboard = document.getElementById('dashboard');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/json') {
+                processFile(file);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        });
+        
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    visualizeData(data);
+                } catch (error) {
+                    alert('Error parsing JSON file. Please ensure it\'s a valid analysis export.');
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function visualizeData(data) {
+            // Hide upload area, show dashboard
+            uploadArea.style.display = 'none';
+            dashboard.style.display = 'block';
+            
+            // Update summary metrics
+            const avgQuality = data.summary.averageQuality;
+            document.getElementById('avgQuality').textContent = (avgQuality * 100).toFixed(0) + '%';
+            document.getElementById('avgQuality').className = 'metric-value ' + getScoreClass(avgQuality);
+            
+            document.getElementById('totalMessages').textContent = data.summary.totalMessages;
+            document.getElementById('participants').textContent = data.summary.participants.length;
+            
+            const duration = data.metadata.duration;
+            const minutes = Math.floor(duration / 60000);
+            const seconds = Math.floor((duration % 60000) / 1000);
+            document.getElementById('duration').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Create timeline chart
+            createTimelineChart(data.scoreTimeline);
+            
+            // Create metrics breakdown chart
+            createMetricsChart(data.messages);
+            
+            // Display insights
+            displayInsights(data);
+            
+            // Display messages
+            displayMessages(data.messages);
+        }
+        
+        function createTimelineChart(scoreTimeline) {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            
+            if (timelineChart) {
+                timelineChart.destroy();
+            }
+            
+            timelineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: scoreTimeline.map(s => formatTime(s.time)),
+                    datasets: [{
+                        label: 'Overall Coherence',
+                        data: scoreTimeline.map(s => s.score),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100) + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Coherence: ' + (context.parsed.y * 100).toFixed(1) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createMetricsChart(messages) {
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            
+            // Calculate average metrics
+            const avgMetrics = {
+                psi: 0, rho: 0, q: 0, f: 0
+            };
+            
+            messages.forEach(msg => {
+                avgMetrics.psi += msg.metrics.psi;
+                avgMetrics.rho += msg.metrics.rho;
+                avgMetrics.q += msg.metrics.q;
+                avgMetrics.f += msg.metrics.f;
+            });
+            
+            Object.keys(avgMetrics).forEach(key => {
+                avgMetrics[key] = avgMetrics[key] / messages.length;
+            });
+            
+            if (metricsChart) {
+                metricsChart.destroy();
+            }
+            
+            metricsChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Consistency', 'Relevance', 'Engagement', 'Empathy'],
+                    datasets: [{
+                        label: 'Average Metrics',
+                        data: [avgMetrics.psi, avgMetrics.rho, avgMetrics.q, avgMetrics.f],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#667eea'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                callback: function(value) {
+                                    return (value * 100) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displayInsights(data) {
+            const insightsList = document.getElementById('insightsList');
+            insightsList.innerHTML = '';
+            
+            // Add data insights
+            if (data.insights && data.insights.length > 0) {
+                data.insights.forEach(insight => {
+                    const li = document.createElement('li');
+                    li.textContent = insight;
+                    insightsList.appendChild(li);
+                });
+            }
+            
+            // Add custom insights based on data
+            if (data.summary.qualityTrend) {
+                const li = document.createElement('li');
+                li.textContent = `Conversation quality trend: ${data.summary.qualityTrend}`;
+                insightsList.appendChild(li);
+            }
+            
+            const scoreDiff = data.summary.highestScore - data.summary.lowestScore;
+            if (scoreDiff > 0.3) {
+                const li = document.createElement('li');
+                li.textContent = 'High variability in conversation quality';
+                insightsList.appendChild(li);
+            }
+        }
+        
+        function displayMessages(messages) {
+            const messagesList = document.getElementById('messagesList');
+            messagesList.innerHTML = '';
+            
+            messages.forEach(msg => {
+                const item = document.createElement('div');
+                item.className = 'message-item';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.style.flex = '1';
+                
+                const sender = document.createElement('div');
+                sender.className = 'message-sender';
+                sender.textContent = msg.sender;
+                contentDiv.appendChild(sender);
+                
+                const text = document.createElement('div');
+                text.className = 'message-text';
+                text.textContent = msg.text.substring(0, 150) + (msg.text.length > 150 ? '...' : '');
+                contentDiv.appendChild(text);
+                
+                const score = document.createElement('div');
+                score.className = 'message-score ' + getScoreClass(msg.overall);
+                score.textContent = (msg.overall * 100).toFixed(0) + '%';
+                
+                item.appendChild(contentDiv);
+                item.appendChild(score);
+                messagesList.appendChild(item);
+            });
+        }
+        
+        function getScoreClass(score) {
+            if (score >= 0.8) return 'score-high';
+            if (score >= 0.6) return 'score-medium';
+            return 'score-low';
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
