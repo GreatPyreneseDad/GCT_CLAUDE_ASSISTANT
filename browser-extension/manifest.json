@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "GCT Coherence Monitor",
+  "version": "1.0.0",
+  "description": "Real-time coherence analysis for AI conversations using Grounded Coherence Theory",
+  "author": "Chris",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://bard.google.com/*",
+    "https://gemini.google.com/*",
+    "https://poe.com/*",
+    "https://perplexity.ai/*",
+    "http://localhost:5001/*"
+  ],
+  
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://bard.google.com/*",
+        "https://gemini.google.com/*",
+        "https://poe.com/*",
+        "https://perplexity.ai/*"
+      ],
+      "js": ["dist/content.js"],
+      "css": ["dist/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "public/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/inject.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

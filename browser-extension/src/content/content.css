@@ -1,0 +1,30 @@
+/* GCT Coherence Monitor - Content Styles */
+
+.gct-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  opacity: 0.8;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.gct-indicator:hover {
+  transform: scale(1.2);
+  opacity: 1;
+}
+
+/* Widget container - styles are in shadow DOM */
+#gct-coherence-widget {
+  position: fixed;
+  z-index: 999999;
+  pointer-events: none;
+}
+
+#gct-coherence-widget > * {
+  pointer-events: all;
+}
