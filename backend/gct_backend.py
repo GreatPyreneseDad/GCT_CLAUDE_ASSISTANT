@@ -1100,7 +1100,7 @@ def create_app(config_name='production'):
     # Import and register enhanced API endpoints
     # Delayed import to avoid circular dependency
     try:
-        from enhanced_api_endpoints import enhanced_api
+        from gct_enhanced_api import enhanced_api
         app.register_blueprint(enhanced_api)
         logger.info('Enhanced API endpoints registered successfully')
     except ImportError as e:

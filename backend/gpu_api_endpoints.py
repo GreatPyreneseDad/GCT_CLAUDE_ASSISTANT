@@ -6,11 +6,15 @@ import numpy as np
 from typing import List, Dict
 from datetime import datetime
 import time
+import sqlite3
+import logging
 
 # Import GPU acceleration
 from gpu_acceleration import get_accelerator
 from gct_types import CoherenceProfile, CoherenceVariables
-from gct_backend import db, logger
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # Create blueprint
 gpu_api = Blueprint('gpu_api', __name__)
@@ -88,6 +92,7 @@ def similarity_analysis():
         
         # Fetch profiles from database
         profiles = []
+        db = sqlite3.connect('gct_database.db')
         cursor = db.cursor()
         
         for user_id in user_ids:
@@ -111,6 +116,8 @@ def similarity_analysis():
                     timestamp=datetime.fromisoformat(row[7])
                 )
                 profiles.append(profile)
+        
+        db.close()
         
         if len(profiles) < 2:
             return jsonify({'error': 'Need at least 2 profiles for similarity analysis'}), 400
@@ -171,6 +178,7 @@ def pattern_matching():
         
         # Fetch profiles
         profiles = []
+        db = sqlite3.connect('gct_database.db')
         cursor = db.cursor()
         
         for user_id in user_ids:
@@ -194,6 +202,8 @@ def pattern_matching():
                     timestamp=datetime.fromisoformat(row[7])
                 )
                 profiles.append(profile)
+        
+        db.close()
         
         if not profiles:
             return jsonify({'error': 'No valid profiles found'}), 404
@@ -252,6 +262,7 @@ def group_optimization():
         
         # Fetch profiles
         profiles = []
+        db = sqlite3.connect('gct_database.db')
         cursor = db.cursor()
         
         for user_id in user_ids:
@@ -275,6 +286,8 @@ def group_optimization():
                     timestamp=datetime.fromisoformat(row[7])
                 )
                 profiles.append(profile)
+        
+        db.close()
         
         if not profiles:
             return jsonify({'error': 'No valid profiles found'}), 404

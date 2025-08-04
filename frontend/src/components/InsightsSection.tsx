@@ -67,10 +67,10 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({ currentProfile }) => 
         
         <div className="text-center p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg">
           <div className="text-5xl font-bold text-indigo-600">
-            {currentProfile.static_coherence.toFixed(2)}
+            {currentProfile.static_coherence ? currentProfile.static_coherence.toFixed(2) : '0.00'}
           </div>
           <div className="text-lg text-indigo-700 mt-2">Static Coherence Score</div>
-          {currentProfile.coherence_velocity !== undefined && (
+          {currentProfile.coherence_velocity !== undefined && currentProfile.coherence_velocity !== null && (
             <div className="mt-4 flex items-center justify-center space-x-2">
               <TrendingUp className="w-5 h-5 text-indigo-600" />
               <span className="text-sm text-indigo-700">

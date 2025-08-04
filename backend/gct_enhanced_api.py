@@ -15,9 +15,14 @@ from ai_coherence_interaction import AICoherenceAnalyzer, AIInteractionType
 from cultural_calibration import CulturalCoherenceCalibrator, CulturalContext
 from coherence_contagion import CoherenceContagionModel, GroupType
 from coherence_development_prediction import CoherenceDevelopmentPredictor
+from conversational_assessment import ConversationalAssessmentAnalyzer
+from comprehensive_assessment import ComprehensiveAssessmentFramework, QuestionType
+from llm_assessment_analyzer import LLMAssessmentAnalyzer, ResponseAnalysis, DimensionAnalysis
 
 # Import core components (avoiding circular import)
 from gct_backend import GCTDatabase, GCTAssessment
+import sqlite3
+import asyncio
 
 # Create blueprint for enhanced endpoints
 enhanced_api = Blueprint('enhanced_api', __name__)
@@ -29,6 +34,9 @@ ai_analyzer = AICoherenceAnalyzer()
 cultural_calibrator = CulturalCoherenceCalibrator()
 contagion_model = CoherenceContagionModel()
 development_predictor = CoherenceDevelopmentPredictor()
+conversational_analyzer = ConversationalAssessmentAnalyzer()
+comprehensive_framework = ComprehensiveAssessmentFramework()
+llm_analyzer = LLMAssessmentAnalyzer()
 
 # ============================================================================
 # TEMPORAL COHERENCE ENDPOINTS
@@ -526,6 +534,386 @@ def get_integrated_insights(user_id):
         return jsonify({
             'success': True,
             'integrated_insights': insights
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# CONVERSATIONAL ASSESSMENT ENDPOINTS
+# ============================================================================
+
+@enhanced_api.route('/conversational/analyze', methods=['POST'])
+def analyze_conversational_response():
+    """Analyze a conversational assessment response"""
+    try:
+        data = request.json
+        text = data.get('text', '')
+        phase = data.get('phase', 'psi')
+        user_id = data.get('user_id', 'anonymous')
+        
+        # Analyze the response
+        score = conversational_analyzer.analyze_response(text, phase)
+        
+        # Generate contextual follow-up
+        follow_up = conversational_analyzer.generate_follow_up_question(
+            text, phase, score.get(phase, 0.5)
+        )
+        
+        return jsonify({
+            'success': True,
+            'score': score,
+            'follow_up': follow_up,
+            'phase': phase
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@enhanced_api.route('/conversational/complete', methods=['POST'])
+def complete_conversational_assessment():
+    """Complete a full conversational assessment"""
+    try:
+        data = request.json
+        messages = data.get('messages', [])
+        user_id = data.get('user_id', 'anonymous')
+        
+        # Analyze full conversation
+        coherence_vars = conversational_analyzer.analyze_full_conversation(messages)
+        
+        # Calculate overall coherence
+        static_coherence = (
+            coherence_vars.psi + 
+            (coherence_vars.rho * coherence_vars.psi) + 
+            coherence_vars.q + 
+            (coherence_vars.f * coherence_vars.psi)
+        )
+        
+        # Extract insights
+        insights = conversational_analyzer.extract_insights(messages, coherence_vars)
+        
+        # Create profile
+        profile = CoherenceProfile(
+            user_id=user_id,
+            variables=coherence_vars,
+            static_coherence=static_coherence,
+            coherence_velocity=0.0,
+            assessment_tier='conversational',
+            timestamp=datetime.now()
+        )
+        
+        # Store in database (would need to implement this)
+        # database.store_profile(profile)
+        
+        return jsonify({
+            'success': True,
+            'profile': {
+                'user_id': user_id,
+                'static_coherence': static_coherence,
+                'variables': {
+                    'psi': coherence_vars.psi,
+                    'rho': coherence_vars.rho,
+                    'q': coherence_vars.q,
+                    'f': coherence_vars.f
+                },
+                'assessment_type': 'conversational',
+                'timestamp': datetime.now().isoformat()
+            },
+            'insights': insights
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# LLM-BASED ASSESSMENT ENDPOINTS  
+# ============================================================================
+
+@enhanced_api.route('/assessment/complete/llm', methods=['POST'])
+async def complete_llm_assessment():
+    """Complete assessment with LLM-based dynamic analysis"""
+    try:
+        data = request.json
+        responses = data.get('responses', {})
+        user_id = data.get('user_id', 'llm_user')
+        
+        # Create database session
+        db_path = 'gct_data.db'
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Create assessment session
+        cursor.execute("""
+            INSERT INTO assessment_sessions 
+            (user_id, session_type, total_questions, questions_answered, ai_model_used)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, 'comprehensive_llm', 30, len(responses), 'available'))
+        
+        session_id = cursor.lastrowid
+        
+        # Store each response
+        organized_responses = {'psi': [], 'rho': [], 'q': [], 'f': []}
+        
+        for question_id, response_data in responses.items():
+            # Determine dimension from question_id
+            dimension = question_id.split('_')[0]
+            
+            # Store response in database
+            cursor.execute("""
+                INSERT INTO assessment_responses
+                (session_id, question_id, dimension, question_text, question_type, 
+                 response_text, response_value)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (session_id, question_id, dimension, 
+                  response_data.get('question', ''),
+                  response_data.get('type', 'unknown'),
+                  str(response_data.get('answer', '')),
+                  float(response_data.get('answer', 0)) if isinstance(response_data.get('answer'), (int, float)) else None))
+            
+            response_id = cursor.lastrowid
+            
+            # Organize for LLM analysis
+            organized_responses[dimension].append({
+                'question_id': question_id,
+                'question': response_data.get('question', ''),
+                'answer': response_data.get('answer', ''),
+                'type': response_data.get('type', 'story'),
+                'response_id': response_id
+            })
+        
+        conn.commit()
+        
+        # Run LLM analysis
+        try:
+            # Analyze responses with LLM
+            profile, insights = await llm_analyzer.generate_comprehensive_profile(organized_responses)
+            
+            # Store analyses in database
+            for dimension, responses_list in organized_responses.items():
+                if responses_list:
+                    dim_analysis = await llm_analyzer.analyze_dimension_responses(
+                        responses_list, dimension
+                    )
+                    
+                    # Store dimension summary
+                    cursor.execute("""
+                        INSERT INTO dimension_summaries
+                        (session_id, dimension, overall_score, pattern_summary, 
+                         growth_summary, concern_summary)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (session_id, dimension, dim_analysis.overall_score,
+                          ', '.join(dim_analysis.patterns[:3]),
+                          ', '.join(dim_analysis.growth_indicators[:3]),
+                          ', '.join(dim_analysis.concern_areas[:3])))
+                    
+                    # Store individual response analyses
+                    for resp, analysis in zip(responses_list, dim_analysis.response_analyses):
+                        cursor.execute("""
+                            INSERT INTO response_analyses
+                            (response_id, dimension, overall_score, confidence, 
+                             authenticity_score, emotional_tone, analysis_text)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (resp['response_id'], dimension, analysis.raw_score,
+                              analysis.confidence, analysis.authenticity_score,
+                              analysis.emotional_tone, 
+                              f"Key indicators: {', '.join(analysis.key_indicators[:3])}"))
+                        
+                        analysis_id = cursor.lastrowid
+                        
+                        # Store sub-dimension scores
+                        for sub_dim, score in analysis.sub_dimensions.items():
+                            cursor.execute("""
+                                INSERT INTO subdimension_scores
+                                (analysis_id, subdimension_name, score)
+                                VALUES (?, ?, ?)
+                            """, (analysis_id, sub_dim, score))
+            
+            # Store final profile
+            cursor.execute("""
+                INSERT INTO coherence_profiles_detailed
+                (user_id, session_id, psi_score, rho_score, q_score, f_score,
+                 static_coherence, coherence_level, assessment_quality)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, session_id, profile.variables.psi, profile.variables.rho,
+                  profile.variables.q, profile.variables.f, profile.static_coherence,
+                  insights['overall_coherence_level'], 0.9))
+            
+            profile_id = cursor.lastrowid
+            
+            # Store insights
+            for strength in insights['strengths']:
+                cursor.execute("""
+                    INSERT INTO assessment_insights
+                    (profile_id, insight_type, insight_text, priority)
+                    VALUES (?, ?, ?, ?)
+                """, (profile_id, 'strength', strength, 1))
+            
+            for growth in insights['growth_areas']:
+                cursor.execute("""
+                    INSERT INTO assessment_insights
+                    (profile_id, insight_type, insight_text, priority)
+                    VALUES (?, ?, ?, ?)
+                """, (profile_id, 'growth_area', growth, 2))
+            
+            for i, rec in enumerate(insights['recommendations']):
+                cursor.execute("""
+                    INSERT INTO assessment_insights
+                    (profile_id, insight_type, insight_text, priority)
+                    VALUES (?, ?, ?, ?)
+                """, (profile_id, 'recommendation', rec, 3 + i))
+            
+            # Mark session as completed
+            cursor.execute("""
+                UPDATE assessment_sessions
+                SET status = 'completed', completed_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (session_id,))
+            
+            conn.commit()
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'profile': {
+                    'user_id': user_id,
+                    'static_coherence': profile.static_coherence,
+                    'variables': {
+                        'psi': profile.variables.psi,
+                        'rho': profile.variables.rho,
+                        'q': profile.variables.q,
+                        'f': profile.variables.f
+                    },
+                    'coherence_level': insights['overall_coherence_level'],
+                    'assessment_type': 'llm_comprehensive',
+                    'timestamp': datetime.now().isoformat()
+                },
+                'insights': insights,
+                'session_id': session_id
+            })
+            
+        except Exception as ai_error:
+            # Fallback to basic analysis
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': f'AI analysis failed: {str(ai_error)}',
+                'fallback': True
+            }), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# COMPREHENSIVE ASSESSMENT ENDPOINTS
+# ============================================================================
+
+@enhanced_api.route('/assessment/complete', methods=['POST'])
+def complete_comprehensive_assessment():
+    """Complete a comprehensive multi-layered assessment"""
+    try:
+        data = request.json
+        responses = data.get('responses', {})
+        user_id = data.get('user_id', 'comprehensive_user')
+        
+        # Calculate scores for each dimension
+        dimension_scores = {}
+        dimension_insights = {}
+        
+        for dimension in ['psi', 'rho', 'q', 'f']:
+            score = comprehensive_framework.calculate_dimension_score(
+                dimension, 
+                responses
+            )
+            dimension_scores[dimension] = score
+            
+            # Get subdimension analysis
+            sub_dimensions = getattr(
+                comprehensive_framework, 
+                f'_get_{dimension}_subdimensions'
+            )()
+            dimension_insights[dimension] = {
+                'score': score,
+                'sub_dimensions': sub_dimensions
+            }
+        
+        # Create coherence variables
+        coherence_vars = CoherenceVariables(
+            psi=dimension_scores['psi'],
+            rho=dimension_scores['rho'],
+            q=dimension_scores['q'],
+            f=dimension_scores['f']
+        )
+        
+        # Calculate overall coherence
+        static_coherence = (
+            coherence_vars.psi + 
+            (coherence_vars.rho * coherence_vars.psi) + 
+            coherence_vars.q + 
+            (coherence_vars.f * coherence_vars.psi)
+        )
+        
+        # Create profile
+        profile = CoherenceProfile(
+            user_id=user_id,
+            variables=coherence_vars,
+            static_coherence=static_coherence,
+            coherence_velocity=0.0,
+            assessment_tier='comprehensive',
+            timestamp=datetime.now()
+        )
+        
+        # Store in database
+        db = GCTDatabase()
+        assessment = GCTAssessment(db)
+        assessment.save_assessment(profile)
+        
+        # Generate comprehensive insights
+        insights = {
+            'strengths': [],
+            'growth_areas': [],
+            'recommendations': []
+        }
+        
+        # Analyze each dimension
+        for dimension, score in dimension_scores.items():
+            dim_name = {
+                'psi': 'Internal Consistency',
+                'rho': 'Wisdom Integration',
+                'q': 'Moral Activation',
+                'f': 'Social Belonging'
+            }[dimension]
+            
+            if score > 0.7:
+                insights['strengths'].append(f"Strong {dim_name} ({score:.0%})")
+            elif score < 0.4:
+                insights['growth_areas'].append(f"{dim_name} needs attention ({score:.0%})")
+        
+        # Add top recommendations
+        lowest_dim = min(dimension_scores.items(), key=lambda x: x[1])
+        recommendation_map = {
+            'psi': "Focus on aligning your daily actions with your core values",
+            'rho': "Develop a practice of reflection to extract wisdom from experiences",
+            'q': "Look for small opportunities to take meaningful action each day",
+            'f': "Invest time in deepening your most important relationships"
+        }
+        insights['recommendations'].append(recommendation_map[lowest_dim[0]])
+        
+        return jsonify({
+            'success': True,
+            'profile': {
+                'user_id': user_id,
+                'static_coherence': static_coherence,
+                'variables': {
+                    'psi': coherence_vars.psi,
+                    'rho': coherence_vars.rho,
+                    'q': coherence_vars.q,
+                    'f': coherence_vars.f
+                },
+                'assessment_type': 'comprehensive',
+                'timestamp': datetime.now().isoformat()
+            },
+            'insights': insights,
+            'dimension_analysis': dimension_insights
         })
         
     except Exception as e:

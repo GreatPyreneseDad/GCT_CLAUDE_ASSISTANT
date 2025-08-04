@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Info } from 'lucide-react';
+import { CheckCircle, Info, MessageSquare, SlidersHorizontal } from 'lucide-react';
 import GCTApiClient from '@/lib/api-client';
 import { CoherenceProfile } from '@/types';
+import { EnhancedConversationalAssessment } from './EnhancedConversationalAssessment';
+import { TestRunner } from './TestRunner';
 
 interface AssessmentSectionProps {
   apiClient: GCTApiClient;
@@ -17,11 +19,12 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({
   userId, 
   onProfileUpdate 
 }) => {
-  const [assessmentType, setAssessmentType] = useState<'tier1' | 'tier2'>('tier1');
+  const [assessmentType, setAssessmentType] = useState<'tier1' | 'tier2' | 'conversational'>('conversational');
   const [isAssessing, setIsAssessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [age, setAge] = useState<number | undefined>();
+  const [showAssessment, setShowAssessment] = useState(false);
 
   const tier1Questions = [
     {
@@ -141,12 +144,126 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({
     );
   }
 
+  // Handle conversational assessment completion
+  const handleConversationalComplete = async (profile: any) => {
+    try {
+      // Submit to backend
+      const result = await apiClient.submitTier1Assessment(
+        profile.user_id,
+        profile.variables,
+        age
+      );
+      onProfileUpdate(result);
+      setShowAssessment(false);
+    } catch (error) {
+      console.error('Failed to submit conversational assessment:', error);
+    }
+  };
+
+  // Show conversational assessment if selected and started
+  if (showAssessment && assessmentType === 'conversational') {
+    return (
+      <div className="space-y-6">
+        <EnhancedConversationalAssessment onComplete={handleConversationalComplete} />
+      </div>
+    );
+  }
+
+  // Show traditional assessment if selected and started
+  if (showAssessment && (assessmentType === 'tier1' || assessmentType === 'tier2')) {
+    // Traditional slider assessment logic here
+    const currentQuestions = tier1Questions;
+    const totalQuestions = currentQuestions.reduce((acc, cat) => acc + cat.questions.length, 0);
+    const questionsAnswered = Object.keys(responses).length;
+    const progress = (questionsAnswered / totalQuestions) * 100;
+
+    return (
+      <div className="space-y-6">
+        {/* Your existing slider assessment UI */}
+        {currentStep < currentQuestions.length && (
+          <>
+            {/* Progress Bar */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Progress</span>
+                <span className="text-sm text-gray-500">{questionsAnswered} of {totalQuestions} questions</span>
+              </div>
+              <Progress value={progress} className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-indigo-600 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </Progress>
+            </div>
+
+            {/* Questions */}
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-lg shadow-sm p-6"
+            >
+              <h3 className="text-lg font-semibold mb-6">{currentQuestions[currentStep].category}</h3>
+              <div className="space-y-6">
+                {currentQuestions[currentStep].questions.map((question) => (
+                  <div key={question.key}>
+                    {renderQuestion(question)}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-between mt-8">
+                <button
+                  onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                  disabled={currentStep === 0}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                
+                {currentStep === currentQuestions.length - 1 ? (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={questionsAnswered < totalQuestions || isAssessing}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  >
+                    {isAssessing ? 'Processing...' : 'Submit Assessment'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setCurrentStep(currentStep + 1)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Next
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Assessment Type Selection */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold mb-4">Choose Assessment Type</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
+          <button
+            onClick={() => setAssessmentType('conversational')}
+            className={`p-4 rounded-lg border-2 transition-all ${
+              assessmentType === 'conversational' 
+                ? 'border-indigo-600 bg-indigo-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <MessageSquare className="w-8 h-8 mx-auto mb-2 text-indigo-600" />
+            <h4 className="font-semibold">AI Conversation</h4>
+            <p className="text-sm text-gray-600 mt-1">Natural chat • 5-10 minutes</p>
+            <p className="text-xs text-indigo-600 mt-1">✨ Recommended</p>
+          </button>
           <button
             onClick={() => setAssessmentType('tier1')}
             className={`p-4 rounded-lg border-2 transition-all ${
@@ -155,8 +272,9 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
-            <h4 className="font-semibold">Tier 1: Quick Assessment</h4>
-            <p className="text-sm text-gray-600 mt-1">15-20 minutes</p>
+            <SlidersHorizontal className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+            <h4 className="font-semibold">Quick Sliders</h4>
+            <p className="text-sm text-gray-600 mt-1">Traditional • 15-20 minutes</p>
           </button>
           <button
             onClick={() => setAssessmentType('tier2')}
@@ -171,6 +289,25 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Start Assessment Button */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <button
+          onClick={() => setShowAssessment(true)}
+          className="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
+        >
+          Start {assessmentType === 'conversational' ? 'AI Conversation' : 'Assessment'}
+        </button>
+      </div>
+
+      {/* Test Runner - Only show in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <TestRunner onRunTest={(testResponses) => {
+          // Automatically run the assessment with test data
+          console.log('Running automated test with responses:', testResponses);
+          // You can add logic here to automatically fill and submit the assessment
+        }} />
+      )}
 
       {/* Age Input */}
       <div className="bg-white rounded-lg shadow-sm p-6">
